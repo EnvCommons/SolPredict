@@ -83,7 +83,7 @@ class SolpredictEnvironment(CLIEnvironment):
         self.sandbox_settings = SandboxSettings(
             environment="GeneralReasoning/SolPredict",
             image="generalreasoning/python-ds:3.12-tools",
-            machine_size="1:2",  # 1 CPU, 2GB RAM
+            machine_size="4:8",  # 4 CPU, 8GB RAM
             block_network=False,  # Allow pip install
             bucket_config=SandboxBucketConfig(
                 mount_path="/orwd_data",
