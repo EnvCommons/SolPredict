@@ -23,7 +23,7 @@ async def main():
     SPLIT = "train"
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-    environment = or_client.environments.get(name=ENV_NAME, base_url="http://localhost:8080")
+    environment = or_client.environments.get(name=ENV_NAME)
     tasks = await environment.list_tasks(split=SPLIT)
     tools = await environment.list_tools(format="openai")
 
