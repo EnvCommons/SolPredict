@@ -19,7 +19,7 @@ Agents in SolPredict are given a sandbox with 4 CPUs and 8GB RAM, network access
 
 ## License
 
-[MIT](https://opensource.org/license/mit).
+[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/deed.en).
 
 ## Tasks
 
