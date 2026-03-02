@@ -40,6 +40,8 @@ $$\text{Reward} = -\text{RMSE} = -\sqrt{\frac{1}{n}\sum_{i=1}^{n}(\hat{y}_i - y_
 
 Higher (less negative) reward is better, with a maximum of 0.0 for perfect predictions.
 
+Note that this is unnormalised, and we rely on group advantage normalisation during training to achieve this; but if you need normalisation *ex ante*, it is recommended to take the returned reward from the tool result and normalise it.
+
 We do not use LLM graders for this task.
 
 ## Data
