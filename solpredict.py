@@ -242,11 +242,11 @@ Good luck!
 
     @classmethod
     def list_splits(cls) -> list[str]:
-        return ["train", "test"]
+        return ["train"]
 
     @classmethod
     def list_tasks(cls, split: str) -> list[JSONObject]:
         """Return single task per split (one prediction task)."""
-        if split not in ["train", "test"]:
+        if split not in ["train"]:
             return []
         return [{"id": f"solubility_{split}"}]

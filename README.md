@@ -23,7 +23,7 @@ Agents in SolPredict are given a sandbox with 4 CPUs and 8GB RAM, network access
 
 ## Tasks
 
-There is one task per split (train and test). Each task requires the agent to:
+There is a single task in the train split. This task requires the agent to:
 
 1. Explore the provided training data (`train.csv` with SMILES and LogS columns, 7,093 compounds) and validation data (`val.csv`, 1,772 compounds).
 2. Develop a predictive model for aqueous solubility (LogS).
