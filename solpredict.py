@@ -6,7 +6,7 @@ aqueous solubility (LogS) from molecular SMILES notation.
 
 Training: AqSolDB (scaffold-split, ESOL removed)
 Test: ESOL (external validation set)
-Reward: -RMSE on test set
+Reward: 1 - RMSE/baseline_RMSE (normalized against naive mean predictor)
 """
 
 import json
@@ -45,6 +45,10 @@ def load_ground_truth() -> dict[str, float]:
 GROUND_TRUTH = load_ground_truth()
 if GROUND_TRUTH:
     print(f"Loaded ground truth for {len(GROUND_TRUTH)} test compounds")
+
+
+# Baseline RMSE: naive predictor (training mean = -2.7144 for all test compounds)
+BASELINE_RMSE = 2.1203
 
 
 class TaskSpec(BaseModel):
@@ -132,7 +136,8 @@ c1ccccc1,-2.18
 
 ## Scoring
 Your predictions will be scored using RMSE (Root Mean Squared Error) against the true LogS values.
-Lower RMSE is better. Reward = -RMSE.
+Lower RMSE is better. Reward = 1 - RMSE/baseline, where baseline is the naive mean predictor.
+Positive reward means you beat the baseline; 1.0 would be perfect.
 
 Good luck!
 """
@@ -192,8 +197,8 @@ Good luck!
             y_pred = np.array(y_pred)
             rmse = float(np.sqrt(np.mean((y_true - y_pred) ** 2)))
 
-            # Reward is negative RMSE (higher is better, max is 0)
-            reward = -rmse
+            # Normalized reward: 1.0 = perfect, 0.0 = baseline (train mean), negative = worse
+            reward = 1.0 - (rmse / BASELINE_RMSE)
 
             # Build result message
             coverage = len(y_true) / len(self.ground_truth) * 100
@@ -206,7 +211,8 @@ Good luck!
                 "",
                 "### Scoring",
                 f"RMSE: {rmse:.4f}",
-                f"Reward: {reward:.4f}",
+                f"Baseline RMSE: {BASELINE_RMSE:.4f}",
+                f"Reward: {reward:.4f} (>0 = better than baseline)",
             ]
 
             if missing:
@@ -225,6 +231,7 @@ Good luck!
                     "predictions_matched": len(y_true),
                     "coverage": coverage,
                     "rmse": rmse,
+                    "baseline_rmse": BASELINE_RMSE,
                     "reward": reward,
                 },
                 blocks=[TextBlock(text=result)],
