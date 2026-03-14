@@ -4,7 +4,7 @@
 
 ## Description
 
-SolPredict is an ORS environment for evaluating an agent's ability to develop machine learning models that predict aqueous solubility (LogS) from molecular SMILES notation. Agents are given training data from the AqSolDB database, develop and train predictive models in a sandboxed compute environment, and submit predictions for test molecules from the ESOL (Delaney) dataset.
+SolPredict is an ORS environment for evaluating an agent's ability to develop ML models that predict aqueous solubility (LogS) from molecular SMILES notation. Agents are given training data from the AqSolDB database, develop and train predictive models in a sandboxed compute environment, and submit predictions for test molecules from the ESOL (Delaney) dataset.
 
 ## Capabilities
 
