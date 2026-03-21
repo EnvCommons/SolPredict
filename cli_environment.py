@@ -264,18 +264,11 @@ class CLIEnvironment(Environment):
             )
 
     @tool
-    def multi_edit(self, params: MultiEditParams) -> ToolOutput:
-        """Perform multiple edits on a single file."""
+    async def multi_edit(self, params: MultiEditParams) -> ToolOutput:
+        """Perform multiple edits on a single file via the sandbox."""
         try:
-            if not os.path.exists(params.file_path):
-                return ToolOutput(
-                    metadata={"error": "File does not exist"},
-                    blocks=[TextBlock(text="File does not exist")],
-                    finished=False
-                )
-
-            with open(params.file_path, 'r', encoding='utf-8') as f:
-                content = f.read()
+            # Read file from sandbox
+            content = await download_text(self.sandbox, params.file_path)
 
             total_replacements = 0
 
@@ -300,8 +293,8 @@ class CLIEnvironment(Environment):
 
                 total_replacements += replacements
 
-            with open(params.file_path, 'w', encoding='utf-8') as f:
-                f.write(content)
+            # Write file back to sandbox
+            await upload_text(self.sandbox, params.file_path, content, ensure_trailing_newline=True)
 
             return ToolOutput(
                 metadata={"total_replacements": total_replacements, "edits_applied": len(params.edits)},
