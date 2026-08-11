@@ -1,3 +1,4 @@
+import math
 import os
 from typing import Dict, List, Any, Optional
 from pydantic import BaseModel
@@ -85,7 +86,9 @@ class CLIEnvironment(Environment):
     async def bash(self, params: BashParams) -> ToolOutput:
         """Execute bash commands using the computer instance."""
         try:
-            requested = DEFAULT_BASH_TIMEOUT if params.timeout is None else params.timeout
+            requested = params.timeout
+            if requested is None or not math.isfinite(requested):
+                requested = DEFAULT_BASH_TIMEOUT
             timeout = min(max(requested, 1.0), MAX_BASH_TIMEOUT)
 
             output, code = await self.sandbox.run(

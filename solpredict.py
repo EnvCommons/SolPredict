@@ -10,6 +10,7 @@ Reward: 1 - RMSE/baseline_RMSE (normalized against naive mean predictor)
 """
 
 import json
+import math
 import numpy as np
 import os
 import shlex
@@ -49,6 +50,7 @@ if GROUND_TRUTH:
 
 
 # Baseline RMSE: naive predictor (training mean = -2.7144 for all test compounds)
+TRAIN_MEAN_LOGS = -2.7144
 BASELINE_RMSE = 2.1203
 
 
@@ -145,6 +147,9 @@ c1ccccc1,-2.18
 
 ## Scoring
 Your predictions will be scored using RMSE (Root Mean Squared Error) against the true LogS values.
+Every test molecule is scored. Any molecule you do not predict, or predict with a value that is
+not a finite number, is scored as if you had predicted the naive baseline, so submitting only the
+compounds you are confident about does not help you.
 Lower RMSE is better. Reward = 1 - RMSE/baseline, where baseline is the naive mean predictor.
 Positive reward means you beat the baseline; 1.0 would be perfect.
 
@@ -197,27 +202,33 @@ Good luck!
 
         # Build predictions dict
         predictions = {}
+        unusable = 0
         for _, row in submission_df.iterrows():
             smiles = str(row["SMILES"]).strip()
             try:
                 logs = float(row["LogS"])
-                predictions[smiles] = logs
             except (ValueError, TypeError):
-                pass
+                unusable += 1
+                continue
+            if not math.isfinite(logs):
+                unusable += 1
+                continue
+            predictions[smiles] = logs
 
-        # Match predictions to ground truth
         y_true = []
         y_pred = []
         missing = []
 
         for smiles, true_logs in self.ground_truth.items():
+            y_true.append(true_logs)
             if smiles in predictions:
-                y_true.append(true_logs)
                 y_pred.append(predictions[smiles])
             else:
                 missing.append(smiles)
+                y_pred.append(TRAIN_MEAN_LOGS)
 
-        if len(y_true) == 0:
+        matched = len(y_true) - len(missing)
+        if matched == 0:
             return ToolOutput(
                 metadata={"error": "No matching SMILES found in submission"},
                 blocks=[TextBlock(text="Error: No matching SMILES found. Check your SMILES format.")],
@@ -234,24 +245,31 @@ Good luck!
         reward = 1.0 - (rmse / BASELINE_RMSE)
 
         # Build result message
-        coverage = len(y_true) / len(self.ground_truth) * 100
+        coverage = matched / len(self.ground_truth) * 100
 
         result_parts = [
             "## Submission Results",
             "",
             f"Predictions submitted: {len(predictions)}",
-            f"Predictions matched: {len(y_true)} / {len(self.ground_truth)} ({coverage:.1f}% coverage)",
+            f"Predictions matched: {matched} / {len(self.ground_truth)} ({coverage:.1f}% coverage)",
             "",
             "### Scoring",
-            f"RMSE: {rmse:.4f}",
+            f"RMSE: {rmse:.4f} (over all {len(self.ground_truth)} test compounds)",
             f"Baseline RMSE: {BASELINE_RMSE:.4f}",
             f"Reward: {reward:.4f} (>0 = better than baseline)",
         ]
+
+        if unusable:
+            result_parts.extend([
+                "",
+                f"{unusable} row(s) had a LogS value that was not a finite number and were ignored.",
+            ])
 
         if missing:
             result_parts.extend([
                 "",
                 "### Missing Predictions",
+                f"{len(missing)} test compound(s) were not predicted and were scored at the baseline.",
                 f"First 10 missing: {missing[:10]}"
             ])
 
@@ -261,7 +279,7 @@ Good luck!
             metadata={
                 "task_id": self.validated.id,
                 "predictions_submitted": len(predictions),
-                "predictions_matched": len(y_true),
+                "predictions_matched": matched,
                 "coverage": coverage,
                 "rmse": rmse,
                 "baseline_rmse": BASELINE_RMSE,
