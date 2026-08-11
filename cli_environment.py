@@ -11,7 +11,7 @@ from utils import (download_text, upload_text)
 # Pydantic models for tool inputs
 class BashParams(BaseModel, extra="forbid"):
     command: str
-    timeout: Optional[float] = 30.0
+    timeout: Optional[float] = 300.0
 
 
 class GlobParams(BaseModel, extra="forbid"):
@@ -81,7 +81,8 @@ class CLIEnvironment(Environment):
     async def bash(self, params: BashParams) -> ToolOutput:
         """Execute bash commands using the computer instance."""
         try:
-            output, code = await self.sandbox.run(params.command.strip())
+            output, code = await self.sandbox.run(
+                params.command.strip(), timeout=params.timeout)
 
             return ToolOutput(
                 blocks=[TextBlock(text=f"{output}\n\n(exit {code})")],

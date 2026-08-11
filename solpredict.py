@@ -12,6 +12,7 @@ Reward: 1 - RMSE/baseline_RMSE (normalized against naive mean predictor)
 import json
 import numpy as np
 import os
+import shlex
 from io import StringIO
 from pathlib import Path
 from typing import List, Dict, Any
@@ -49,6 +50,10 @@ if GROUND_TRUTH:
 
 # Baseline RMSE: naive predictor (training mean = -2.7144 for all test compounds)
 BASELINE_RMSE = 2.1203
+
+
+class SubmissionUnavailable(Exception):
+    """The agent did not write a submission file at the path it named."""
 
 
 class TaskSpec(BaseModel):
@@ -143,109 +148,120 @@ Good luck!
 """
         return [TextBlock(text=prompt)]
 
+    async def _read_submission(self, path: str) -> str:
+        _, code = await self.sandbox.run(f"test -f {shlex.quote(path)}")
+        if code != 0:
+            raise SubmissionUnavailable(f"{path} does not exist in the sandbox")
+        return await download_text(self.sandbox, path)
+
     @tool
     async def submit(self, params: SubmitParams) -> ToolOutput:
         """Submit predictions for scoring against the hidden test set."""
         try:
-            # Read submission file from sandbox
-            content = await download_text(self.sandbox, params.submission_path)
-
-            # Parse as CSV
-            submission_df = pd.read_csv(StringIO(content))
-
-            # Validate columns
-            if "SMILES" not in submission_df.columns or "LogS" not in submission_df.columns:
-                return ToolOutput(
-                    metadata={"error": "Submission must have columns: SMILES, LogS"},
-                    blocks=[TextBlock(text="Error: Submission must have columns: SMILES, LogS")],
-                    reward=0.0,
-                    finished=False
-                )
-
-            # Build predictions dict
-            predictions = {}
-            for _, row in submission_df.iterrows():
-                smiles = str(row["SMILES"]).strip()
-                try:
-                    logs = float(row["LogS"])
-                    predictions[smiles] = logs
-                except (ValueError, TypeError):
-                    pass
-
-            # Match predictions to ground truth
-            y_true = []
-            y_pred = []
-            missing = []
-
-            for smiles, true_logs in self.ground_truth.items():
-                if smiles in predictions:
-                    y_true.append(true_logs)
-                    y_pred.append(predictions[smiles])
-                else:
-                    missing.append(smiles)
-
-            if len(y_true) == 0:
-                return ToolOutput(
-                    metadata={"error": "No matching SMILES found in submission"},
-                    blocks=[TextBlock(text="Error: No matching SMILES found. Check your SMILES format.")],
-                    reward=0.0,
-                    finished=False
-                )
-
-            # Calculate RMSE
-            y_true = np.array(y_true)
-            y_pred = np.array(y_pred)
-            rmse = float(np.sqrt(np.mean((y_true - y_pred) ** 2)))
-
-            # Normalized reward: 1.0 = perfect, 0.0 = baseline (train mean), negative = worse
-            reward = 1.0 - (rmse / BASELINE_RMSE)
-
-            # Build result message
-            coverage = len(y_true) / len(self.ground_truth) * 100
-
-            result_parts = [
-                "## Submission Results",
-                "",
-                f"Predictions submitted: {len(predictions)}",
-                f"Predictions matched: {len(y_true)} / {len(self.ground_truth)} ({coverage:.1f}% coverage)",
-                "",
-                "### Scoring",
-                f"RMSE: {rmse:.4f}",
-                f"Baseline RMSE: {BASELINE_RMSE:.4f}",
-                f"Reward: {reward:.4f} (>0 = better than baseline)",
-            ]
-
-            if missing:
-                result_parts.extend([
-                    "",
-                    "### Missing Predictions",
-                    f"First 10 missing: {missing[:10]}"
-                ])
-
-            result = "\n".join(result_parts)
-
-            return ToolOutput(
-                metadata={
-                    "task_id": self.validated.id,
-                    "predictions_submitted": len(predictions),
-                    "predictions_matched": len(y_true),
-                    "coverage": coverage,
-                    "rmse": rmse,
-                    "baseline_rmse": BASELINE_RMSE,
-                    "reward": reward,
-                },
-                blocks=[TextBlock(text=result)],
-                reward=reward,
-                finished=True
-            )
-
-        except Exception as e:
+            content = await self._read_submission(params.submission_path)
+        except SubmissionUnavailable as e:
             return ToolOutput(
                 metadata={"error": str(e)},
-                blocks=[TextBlock(text=f"Error processing submission: {str(e)}")],
+                blocks=[TextBlock(text=f"Error: {e}. Write your predictions there first.")],
                 reward=0.0,
                 finished=False
             )
+
+        try:
+            submission_df = pd.read_csv(StringIO(content))
+        except Exception as e:
+            return ToolOutput(
+                metadata={"error": f"could not parse {params.submission_path} as CSV: {e}"},
+                blocks=[TextBlock(text=f"Error: could not parse {params.submission_path} as CSV: {e}")],
+                reward=0.0,
+                finished=False
+            )
+
+        # Validate columns
+        if "SMILES" not in submission_df.columns or "LogS" not in submission_df.columns:
+            return ToolOutput(
+                metadata={"error": "Submission must have columns: SMILES, LogS"},
+                blocks=[TextBlock(text="Error: Submission must have columns: SMILES, LogS")],
+                reward=0.0,
+                finished=False
+            )
+
+        # Build predictions dict
+        predictions = {}
+        for _, row in submission_df.iterrows():
+            smiles = str(row["SMILES"]).strip()
+            try:
+                logs = float(row["LogS"])
+                predictions[smiles] = logs
+            except (ValueError, TypeError):
+                pass
+
+        # Match predictions to ground truth
+        y_true = []
+        y_pred = []
+        missing = []
+
+        for smiles, true_logs in self.ground_truth.items():
+            if smiles in predictions:
+                y_true.append(true_logs)
+                y_pred.append(predictions[smiles])
+            else:
+                missing.append(smiles)
+
+        if len(y_true) == 0:
+            return ToolOutput(
+                metadata={"error": "No matching SMILES found in submission"},
+                blocks=[TextBlock(text="Error: No matching SMILES found. Check your SMILES format.")],
+                reward=0.0,
+                finished=False
+            )
+
+        # Calculate RMSE
+        y_true = np.array(y_true)
+        y_pred = np.array(y_pred)
+        rmse = float(np.sqrt(np.mean((y_true - y_pred) ** 2)))
+
+        # Normalized reward: 1.0 = perfect, 0.0 = baseline (train mean), negative = worse
+        reward = 1.0 - (rmse / BASELINE_RMSE)
+
+        # Build result message
+        coverage = len(y_true) / len(self.ground_truth) * 100
+
+        result_parts = [
+            "## Submission Results",
+            "",
+            f"Predictions submitted: {len(predictions)}",
+            f"Predictions matched: {len(y_true)} / {len(self.ground_truth)} ({coverage:.1f}% coverage)",
+            "",
+            "### Scoring",
+            f"RMSE: {rmse:.4f}",
+            f"Baseline RMSE: {BASELINE_RMSE:.4f}",
+            f"Reward: {reward:.4f} (>0 = better than baseline)",
+        ]
+
+        if missing:
+            result_parts.extend([
+                "",
+                "### Missing Predictions",
+                f"First 10 missing: {missing[:10]}"
+            ])
+
+        result = "\n".join(result_parts)
+
+        return ToolOutput(
+            metadata={
+                "task_id": self.validated.id,
+                "predictions_submitted": len(predictions),
+                "predictions_matched": len(y_true),
+                "coverage": coverage,
+                "rmse": rmse,
+                "baseline_rmse": BASELINE_RMSE,
+                "reward": reward,
+            },
+            blocks=[TextBlock(text=result)],
+            reward=reward,
+            finished=True
+        )
 
     @classmethod
     def list_splits(cls) -> list[str]:
