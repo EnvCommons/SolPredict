@@ -137,6 +137,10 @@ c1ccccc1,-2.18
 ## Available Tools
 - Full CLI access: bash, read, write, edit, glob, grep, ls
 - You may install packages with pip (e.g., rdkit, scikit-learn, xgboost, pytorch)
+- For RDKit use `pip install rdkit`. The `rdkit-pypi` package is deprecated and is not
+  binary-compatible with the numpy already installed here, so it will segfault on import.
+- `bash` takes an optional `timeout` in seconds (default 300, maximum 1800). Long training
+  runs need it raised explicitly.
 - When ready, use submit(submission_path="/path/to/submission.csv") to submit predictions. It's recommend you put it in /home/ubuntu/submission.csv.
 
 ## Scoring
@@ -157,6 +161,11 @@ Good luck!
     @tool
     async def submit(self, params: SubmitParams) -> ToolOutput:
         """Submit predictions for scoring against the hidden test set."""
+        if not self.ground_truth:
+            raise RuntimeError(
+                f"No test ground truth available at {DATA_PATH}; refusing to score this submission"
+            )
+
         try:
             content = await self._read_submission(params.submission_path)
         except SubmissionUnavailable as e:

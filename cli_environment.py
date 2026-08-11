@@ -8,10 +8,14 @@ from openreward.environments import (Environment, JSONObject, TextBlock,
 
 from utils import (download_text, upload_text)
 
+DEFAULT_BASH_TIMEOUT = 300.0
+MAX_BASH_TIMEOUT = 1800.0
+
+
 # Pydantic models for tool inputs
 class BashParams(BaseModel, extra="forbid"):
     command: str
-    timeout: Optional[float] = 300.0
+    timeout: Optional[float] = DEFAULT_BASH_TIMEOUT
 
 
 class GlobParams(BaseModel, extra="forbid"):
@@ -81,8 +85,11 @@ class CLIEnvironment(Environment):
     async def bash(self, params: BashParams) -> ToolOutput:
         """Execute bash commands using the computer instance."""
         try:
+            requested = DEFAULT_BASH_TIMEOUT if params.timeout is None else params.timeout
+            timeout = min(max(requested, 1.0), MAX_BASH_TIMEOUT)
+
             output, code = await self.sandbox.run(
-                params.command.strip(), timeout=params.timeout)
+                params.command.strip(), timeout=timeout)
 
             return ToolOutput(
                 blocks=[TextBlock(text=f"{output}\n\n(exit {code})")],
