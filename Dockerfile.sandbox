@@ -1,0 +1,39 @@
+# generalreasoning/solpredict:1.0
+#
+# SANDBOX image for SolPredict (not the env server -- that is ./Dockerfile).
+#
+# The sandbox runs with block_network=True, because the scored test set is a public
+# benchmark and the holdout cannot be enforced against an agent with egress. Anything
+# the agent needs must therefore be present at BUILD time.
+#
+# The task is unworkable without RDKit, and neither RDKit nor the gradient-boosting
+# libraries ship in python-ds:3.12-tools, so going offline without them would leave the
+# agent unable to compute a single molecular fingerprint. scikit-learn, pandas, numpy
+# and scipy already come from the base image.
+#
+# Build + publish:
+#   docker build -f Dockerfile.sandbox -t generalreasoning/solpredict:1.0 .
+#   docker push generalreasoning/solpredict:1.0
+FROM generalreasoning/python-ds:3.12-tools
+
+RUN pip install --no-cache-dir \
+        rdkit \
+        xgboost \
+        lightgbm
+
+RUN pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu \
+        torch
+
+# Fail the build if anything the agent relies on is missing or ABI-broken, so a broken
+# image can never be published while the sandbox has no network to recover with.
+RUN python3 -c "\
+import numpy, pandas, scipy, sklearn, xgboost, lightgbm, torch, rdkit;\
+from rdkit import Chem;\
+from rdkit.Chem import Descriptors, rdFingerprintGenerator;\
+m = Chem.MolFromSmiles('CCO');\
+assert m is not None;\
+assert rdFingerprintGenerator.GetMorganGenerator(radius=2, fpSize=2048).GetFingerprint(m).GetNumOnBits() > 0;\
+assert Descriptors.MolLogP(m) is not None;\
+print('solpredict sandbox deps OK', numpy.__version__, rdkit.__version__, torch.__version__)"
+
+CMD ["python3"]

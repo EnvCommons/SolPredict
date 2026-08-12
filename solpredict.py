@@ -93,9 +93,9 @@ class SolpredictEnvironment(CLIEnvironment):
         # Set up sandbox with data files mounted
         self.sandbox_settings = SandboxSettings(
             environment="GeneralReasoning/SolPredict",
-            image="generalreasoning/python-ds:3.12-tools",
+            image="generalreasoning/solpredict:1.0",
             machine_size="4:8",  # 4 CPU, 8GB RAM
-            block_network=False,  # Allow pip install
+            block_network=True,
             bucket_config=SandboxBucketConfig(
                 mount_path="/orwd_data",
                 read_only=True,
@@ -138,9 +138,9 @@ c1ccccc1,-2.18
 
 ## Available Tools
 - Full CLI access: bash, read, write, edit, glob, grep, ls
-- You may install packages with pip (e.g., rdkit, scikit-learn, xgboost, pytorch)
-- For RDKit use `pip install rdkit`. The `rdkit-pypi` package is deprecated and is not
-  binary-compatible with the numpy already installed here, so it will segfault on import.
+- This sandbox has no network access. Everything you need is already installed:
+  rdkit, scikit-learn, xgboost, lightgbm, torch (CPU), pandas, numpy, scipy.
+  `pip install` will not work, so build with what is here.
 - `bash` takes an optional `timeout` in seconds (default 300, maximum 1800). Long training
   runs need it raised explicitly.
 - When ready, use submit(submission_path="/path/to/submission.csv") to submit predictions. It's recommend you put it in /home/ubuntu/submission.csv.
