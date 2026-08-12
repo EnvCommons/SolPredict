@@ -15,7 +15,7 @@ SolPredict is an ORS environment for evaluating an agent's ability to develop ML
 
 ## Compute Requirements
 
-Agents are given a sandbox with 4 CPUs and 8GB RAM, with network access enabled for installing additional packages.
+Agents are given a sandbox with 4 CPUs and 8GB RAM. The sandbox has **no network access**, because the test set is drawn from a published benchmark and the holdout cannot be enforced against an agent with egress. The modelling stack is pre-installed instead: RDKit, scikit-learn, XGBoost, LightGBM, PyTorch (CPU), pandas, numpy and scipy. See `Dockerfile.sandbox`.
 
 ## License
 

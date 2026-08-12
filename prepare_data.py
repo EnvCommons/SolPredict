@@ -152,12 +152,18 @@ def main():
     val_df[["SMILES", "LogS"]].to_csv(data_dir / "val.csv", index=False)
     print(f"  Saved train.csv and val.csv")
 
+    n_before = len(esol)
+    esol = esol.drop_duplicates(subset="SMILES", keep="first")
+    if len(esol) < n_before:
+        print(f"  Dropped {n_before - len(esol)} duplicate SMILES from the test set")
+
     # Save test SMILES only (agent sees this)
     esol[["SMILES"]].to_csv(data_dir / "test_smiles.csv", index=False)
     print(f"  Saved test_smiles.csv ({len(esol)} compounds)")
 
     # Save ground truth (hidden from agent, used for scoring)
     ground_truth = {row["SMILES"]: float(row["LogS"]) for _, row in esol.iterrows()}
+    assert len(ground_truth) == len(esol)
     with open(data_dir / "test_ground_truth.json", "w") as f:
         json.dump(ground_truth, f, indent=2)
     print(f"  Saved test_ground_truth.json (hidden)")
