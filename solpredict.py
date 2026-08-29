@@ -54,6 +54,11 @@ TRAIN_MEAN_LOGS = -2.7144
 BASELINE_RMSE = 2.1203
 
 
+# Reward for a submission made after the task has already been graded. Negative
+# so repeat submissions are actively discouraged, not merely left unscored.
+REPEAT_SUBMISSION_PENALTY = -0.1
+
+
 class SubmissionUnavailable(Exception):
     """The agent did not write a submission file at the path it named."""
 
@@ -84,6 +89,10 @@ class SolpredictEnvironment(CLIEnvironment):
         super().__init__(task_spec, secrets=secrets)
 
         self.validated = TaskSpec.model_validate(task_spec)
+
+        # Graded submissions this session. Only the first is scored, so the task
+        # cannot be re-graded for a second payout.
+        self.submitted = 0
 
         # Validate required API key
         api_key = secrets.get("api_key")
@@ -166,6 +175,16 @@ Good luck!
     @tool
     async def submit(self, params: SubmitParams) -> ToolOutput:
         """Submit predictions for scoring against the hidden test set."""
+        if self.submitted > 0:
+            return ToolOutput(
+                blocks=[TextBlock(text="Predictions has already been submitted for this task. "
+                                       "This episode is over: it is not re-scored, and repeat "
+                                       "submissions are penalised (reward -0.1).")],
+                metadata={"already_submitted": True, "submission_count": self.submitted},
+                reward=REPEAT_SUBMISSION_PENALTY,
+                finished=True,
+            )
+
         if not self.ground_truth:
             raise RuntimeError(
                 f"No test ground truth available at {DATA_PATH}; refusing to score this submission"
@@ -274,6 +293,10 @@ Good luck!
             ])
 
         result = "\n".join(result_parts)
+
+        # The malformed-submission paths above all return finished=False without
+        # scoring, so they stay retryable and do not consume the attempt.
+        self.submitted += 1
 
         return ToolOutput(
             metadata={
