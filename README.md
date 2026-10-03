@@ -31,7 +31,7 @@ The single task involves predicting aqueous solubility for 1,128 test molecules.
 
 ## Reward Structure
 
-This is a multi-turn, sandbox-based environment. The agent develops a model, generates predictions as a CSV file, and submits via the `submit` tool. The reward is normalized against a naive baseline (predicting the training mean): `reward = 1 - RMSE / baseline_RMSE`. Positive reward means the agent outperformed the baseline; 1.0 would be perfect predictions. Scoring is deterministic -- no LLM graders are used.
+This is a multi-turn, sandbox-based environment. The agent develops a model, generates predictions as a CSV file, and submits via the `submit` tool. The reward is normalized against a naive baseline (predicting the training mean): `reward = max(-1, 1 - RMSE / baseline_RMSE)`. Rewards are floored at -1.0 (RMSE at or above twice the baseline) so wildly out-of-range predictions cannot produce unbounded negative rewards. Positive reward means the agent outperformed the baseline; 1.0 would be perfect predictions. Scoring is deterministic -- no LLM graders are used.
 
 ## Data
 

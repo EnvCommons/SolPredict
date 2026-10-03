@@ -6,7 +6,7 @@ aqueous solubility (LogS) from molecular SMILES notation.
 
 Training: AqSolDB (scaffold-split, ESOL removed)
 Test: ESOL (external validation set)
-Reward: 1 - RMSE/baseline_RMSE (normalized against naive mean predictor)
+Reward: max(-1, 1 - RMSE/baseline_RMSE) (normalized against naive mean predictor)
 """
 
 import json
@@ -58,6 +58,11 @@ BASELINE_RMSE = 2.1203
 # so repeat submissions are actively discouraged, not merely left unscored.
 REPEAT_SUBMISSION_PENALTY = -0.1
 
+# Lowest reward a scored submission can receive (RMSE >= 2x baseline). Without a
+# floor, 1 - RMSE/baseline is unbounded below: wildly out-of-range predictions
+# (e.g. LogS ~1e75) produce rewards of order -1e75 and wreck reward aggregates.
+REWARD_FLOOR = -1.0
+
 
 class SubmissionUnavailable(Exception):
     """The agent did not write a submission file at the path it named."""
@@ -82,7 +87,7 @@ class SolpredictEnvironment(CLIEnvironment):
     - /data/test_smiles.csv: Test SMILES (no LogS - agent must predict)
 
     Agent submits predictions via submit() tool.
-    Reward is -RMSE on the hidden test set.
+    Reward is max(-1, 1 - RMSE/baseline_RMSE) on the hidden test set.
     """
 
     def __init__(self, task_spec: JSONObject, secrets: dict[str, str] = {}) -> None:
@@ -159,8 +164,8 @@ Your predictions will be scored using RMSE (Root Mean Squared Error) against the
 Every test molecule is scored. Any molecule you do not predict, or predict with a value that is
 not a finite number, is scored as if you had predicted the naive baseline, so submitting only the
 compounds you are confident about does not help you.
-Lower RMSE is better. Reward = 1 - RMSE/baseline, where baseline is the naive mean predictor.
-Positive reward means you beat the baseline; 1.0 would be perfect.
+Lower RMSE is better. Reward = 1 - RMSE/baseline, where baseline is the naive mean predictor,
+floored at -1.0. Positive reward means you beat the baseline; 1.0 would be perfect.
 
 Good luck!
 """
@@ -260,8 +265,9 @@ Good luck!
         y_pred = np.array(y_pred)
         rmse = float(np.sqrt(np.mean((y_true - y_pred) ** 2)))
 
-        # Normalized reward: 1.0 = perfect, 0.0 = baseline (train mean), negative = worse
-        reward = 1.0 - (rmse / BASELINE_RMSE)
+        # Normalized reward: 1.0 = perfect, 0.0 = baseline (train mean), negative = worse,
+        # floored so absurd predictions (or an overflow to inf) cannot go unbounded.
+        reward = max(REWARD_FLOOR, 1.0 - (rmse / BASELINE_RMSE)) if math.isfinite(rmse) else REWARD_FLOOR
 
         # Build result message
         coverage = matched / len(self.ground_truth) * 100
@@ -275,7 +281,7 @@ Good luck!
             "### Scoring",
             f"RMSE: {rmse:.4f} (over all {len(self.ground_truth)} test compounds)",
             f"Baseline RMSE: {BASELINE_RMSE:.4f}",
-            f"Reward: {reward:.4f} (>0 = better than baseline)",
+            f"Reward: {reward:.4f} (>0 = better than baseline, floored at {REWARD_FLOOR})",
         ]
 
         if unusable:
@@ -304,7 +310,7 @@ Good luck!
                 "predictions_submitted": len(predictions),
                 "predictions_matched": matched,
                 "coverage": coverage,
-                "rmse": rmse,
+                "rmse": rmse if math.isfinite(rmse) else None,
                 "baseline_rmse": BASELINE_RMSE,
                 "reward": reward,
             },
