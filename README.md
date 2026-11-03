@@ -23,15 +23,13 @@ Agents are given a sandbox with 4 CPUs and 8GB RAM. The sandbox has **no network
 
 ## Tasks
 
-There is one split in this environment:
-
-- **Train**: 1 task (`solubility_train`)
+There is 1 task in the `train` split (`solubility_train`).
 
 The single task involves predicting aqueous solubility for 1,128 test molecules.
 
 ## Reward Structure
 
-This is a multi-turn, sandbox-based environment. The agent develops a model, generates predictions as a CSV file, and submits via the `submit` tool. The reward is normalized against a naive baseline (predicting the training mean): `reward = max(-1, 1 - RMSE / baseline_RMSE)`. Rewards are floored at -1.0 (RMSE at or above twice the baseline) so wildly out-of-range predictions cannot produce unbounded negative rewards. Positive reward means the agent outperformed the baseline; 1.0 would be perfect predictions. Scoring is deterministic -- no LLM graders are used.
+This is a multi-turn, sandbox-based environment. The agent develops a model, generates predictions as a CSV file, and submits via the `submit` tool. The reward is normalized against a naive baseline (predicting the training mean): `reward = max(-1, 1 - RMSE / baseline_RMSE)`. Rewards are floored at -1.0 (RMSE at or above twice the baseline) so wildly out-of-range predictions cannot produce unbounded negative rewards. Positive reward means the agent outperformed the baseline; 1.0 would be perfect predictions. Every test molecule is scored: a molecule that is missing from the submission, or predicted with a non-finite value, is scored at the baseline. Malformed submissions are rejected without ending the episode; the first scored submission ends it, and a repeat submission gets -0.1. Scoring is deterministic and no LLM graders are used.
 
 ## Data
 
@@ -61,7 +59,7 @@ The environment tests end-to-end ML development skills including data exploratio
 
 ## Other Environment Requirements
 
-There are no further environment requirements; SolPredict works out of the box with the OpenReward endpoint without any external API keys.
+SolPredict needs no external secrets.
 
 ## Safety
 
@@ -79,5 +77,16 @@ Agents in SolPredict develop molecular property prediction models in a sandboxed
   year      = {2019},
   doi       = {10.1038/s41597-019-0151-1},
   url       = {https://www.nature.com/articles/s41597-019-0151-1}
+}
+
+@article{delaney2004esol,
+  author    = {John S. Delaney},
+  title     = {ESOL: Estimating Aqueous Solubility Directly from Molecular Structure},
+  journal   = {Journal of Chemical Information and Computer Sciences},
+  volume    = {44},
+  number    = {3},
+  pages     = {1000--1005},
+  year      = {2004},
+  doi       = {10.1021/ci034243x}
 }
 ```
